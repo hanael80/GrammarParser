@@ -44,6 +44,7 @@ public:
 	HyBool Read( HyUInt8& data)		{ return Serialize( data );	}
 	HyBool Read( HyUInt16& data)	{ return Serialize( data );	}
 	HyBool Read( HyInt32& data)		{ return Serialize( data );	}
+	HyBool Read( HyUInt64& data)	{ return Serialize( data );	}
 	HyBool Read( HySingle& data)	{ return Serialize( data );	}
 
 	HyBool Read( HyString& data )

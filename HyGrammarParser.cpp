@@ -12,7 +12,7 @@
 HyGrammarParser::HyGrammarParser( const HyString& name )
 :
 m_debugging ( false ),
-m_name   ( name )
+m_name      ( name  )
 {
 }
 
@@ -170,7 +170,7 @@ void HyGrammarParser::AddInputGrammar( const HyChar* source, const HyChar* targe
 		m_inputGrammars.push_back( HyGrammar( *srcSymbol ) );
 
 		HyGrammar& grammar = m_inputGrammars.back();
-		grammar.SetId( m_inputGrammars.size() - 1 );
+		grammar.SetId( (HyInt32)( m_inputGrammars.size() ) - 1 );
 
 		m_inputGrammarVector.push_back( &grammar );
 
@@ -196,7 +196,7 @@ void HyGrammarParser::AddInputGrammar( const HyChar* source, const HyChar* targe
 			grammar.m_rightSymbols.push_back( symbol );
 
 		} while( symbolName = strtok( NULL, " " ) );
-		grammar.m_endPosition = grammar.m_rightSymbols.size();
+		grammar.m_endPosition = (HyInt32)( grammar.m_rightSymbols.size() );
 
 		grammar.SetCallBackFunction( callback );
 	}
@@ -205,11 +205,9 @@ void HyGrammarParser::AddInputGrammar( const HyChar* source, const HyChar* targe
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /// @brief	초기화한다.
 ///
-/// @param	flag	플래그
-///
 /// @return	반환 값 없음
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-HyVoid HyGrammarParser::Init( HyUInt32 flag )
+HyVoid HyGrammarParser::Init()
 {
 	HyToken::Init();
 
@@ -238,7 +236,10 @@ HyVoid HyGrammarParser::Init( HyUInt32 flag )
 		HyToken::AddTokenType( symbol.GetName().c_str( ));
 	}
 
-	if ( !(flag & (HyUInt32)( InitFlag::UseDataFile ) ) )
+	HyUInt64 hashCode = _calc_input_grammar_hash();
+
+	startTime = GetTickCount();
+	if ( !_ReadDataFile( hashCode ) )
 	{
 		while ( _InitializeFirsts() ) {}
 
@@ -252,22 +253,11 @@ HyVoid HyGrammarParser::Init( HyUInt32 flag )
 		}
 
 		_MakeLLTable();
-	}
-	else
-	{
-		startTime = GetTickCount();
-		_ReadDataFile();
+		_GenerateDataFile( hashCode );
 	}
 
 	HyUInt32 endTime = GetTickCount();
 	LOG( HyLog::Info, "Init() %d msec", endTime - startTime );
-
-	if ( flag & (HyUInt32)( InitFlag::GenerateDataFile ) )
-	{
-		_GenerateDataFile();
-// 		printf( "데이터 파일이 생성 되었습니다. 데이터 모드 사용 모드로 다시 실행해 주세요.\n" );
-// 		exit( 0 );
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -308,7 +298,7 @@ HyUInt32 HyGrammarParser::_InitializeFirsts()
 		HySymbol& symbol = grammar.GetLeftSymbol();
 
 		const std::vector< const HySymbol* >& rightSymbols = grammar.GetRightSymbols();
-		HyUInt32 rightSymbolCount = rightSymbols.size();
+		HyUInt32 rightSymbolCount = (HyInt32)( rightSymbols.size() );
 
 		HyUInt32 i;
 		for ( i = 0; i < rightSymbolCount; ++i )
@@ -355,7 +345,7 @@ HyUInt32 HyGrammarParser::_InitializeFollows()
 	for ( const HyGrammar& grammar : m_inputGrammars )
 	{
 		const std::vector< const HySymbol* >& tos = grammar.GetRightSymbols();
-		const HyUInt32 toSize = tos.size();
+		const HyUInt32 toSize = (HyInt32)( tos.size() );
 
 		HyUInt32 index = 0;
 		while ( index < toSize )
@@ -551,11 +541,11 @@ void HyGrammarParser::_LexicalAnalysis(const std::string& strString, ParserData&
 						while(*p != '\n')
 							++p;
 
-						const int iLineLength = p - (pszStr + 7);
+						const std::size_t iLineLength = p - (pszStr + 7);
 
 						pszStr += 7;
 						const char* const pszFileName = strtok((char*)pszStr, "#\r\n");
-						const int iLen = strlen(pszFileName);
+						const std::size_t iLen = strlen(pszFileName);
 						pszStr += strlen(pszFileName) + 1;
 						tokenPos.m_fileName	= pszFileName;
 						tokenPos.m_line		= atoi(pszStr);
@@ -904,7 +894,7 @@ void HyGrammarParser::_MakeLLTable()
 
 	for ( const HyGrammar& eachGrammar : m_inputGrammars )
 	{
-		HyUInt32 rightSymbolCount = eachGrammar.m_rightSymbols.size();
+		HyUInt32 rightSymbolCount = (HyInt32)( eachGrammar.m_rightSymbols.size() );
 
 		std::set< HyString > firsts;
 		HyUInt32 i;
@@ -1406,7 +1396,10 @@ HyBool HyGrammarParser::_SyntaxAnalysis_LL( ParserData& parserData )
 				break;
 
 			if ( stacks.empty() )
+			{
+				LOG( HyLog::Warn, "stacks.empty(). [fileName: %s, line: %d]", token.m_pos.m_fileName.c_str(), token.m_pos.m_line );
 				return false;
+			}
 
 			if ( m_debugging )
 				printf( "##### BackTracking\n" );
@@ -1442,7 +1435,10 @@ HyBool HyGrammarParser::_SyntaxAnalysis_LL( ParserData& parserData )
 			}
 
 			if ( stacks.empty() )
+			{
+				LOG( HyLog::Warn, "stacks.empty(). [fileName: %s, line: %d]", token.m_pos.m_fileName.c_str(), token.m_pos.m_line );
 				return false;
+			}
 
 			if ( m_debugging )
 				printf( "##### BackTracking\n" );
@@ -1464,7 +1460,10 @@ HyBool HyGrammarParser::_SyntaxAnalysis_LL( ParserData& parserData )
 				if ( grammars.empty() )
 				{
 					if ( stacks.empty() )
+					{
+						LOG( HyLog::Warn, "stacks.empty(). [fileName: %s, line: %d]", token.m_pos.m_fileName.c_str(), token.m_pos.m_line );
 						return false;
+					}
 
 					if ( m_debugging )
 						printf( "##### BackTracking\n" );
@@ -1737,11 +1736,20 @@ void HyGrammarParser::_ProcessDebugging(
 	}
 }
 
-void HyGrammarParser::_GenerateDataFile()
+////////////////////////////////////////////////////////////////////////////////////////////////////
+/// @brief	generates a data file
+/// 
+/// @param	hashCode	hash code
+///
+/// @return	no return
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void HyGrammarParser::_GenerateDataFile( HyUInt64 hashCode )
 {
 	HyString fileName = HyStringUtil::Format( "%s.dat", m_name.c_str() );
 	HyFileWriter file( fileName, "wb" );
 	HY_ENSURE( file.IsOpened(), return );
+
+	file.Write( hashCode );
 
 	for ( auto& pair : m_symbols )
 	{
@@ -1800,16 +1808,21 @@ void HyGrammarParser::_GenerateDataFile()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /// @brief	데이터 파일을 읽는다.
 ///
-/// @return	반환 값 없음
+/// @param	hashCode	hash code
+/// 
+/// @return	success or failure
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-HyVoid HyGrammarParser::_ReadDataFile()
+HyBool HyGrammarParser::_ReadDataFile( HyUInt64 hashCode )
 {
 	char szFileName[ 256 ];
 	sprintf_s( szFileName, sizeof( szFileName ), "%s.dat", m_name.c_str() );
 
 	HyFileReader file( szFileName, "rb" );
-	if ( !file.IsOpened() )
-		LOG( HyLog::Fatal, "pFile == NULL" );
+	if ( !file.IsOpened() ) return false;
+
+	HyUInt64 oldHashCode = 0;
+	if ( !file.Read( oldHashCode ) ) return false;
+	if ( hashCode != oldHashCode ) return false;
 
 //	m_mapLLTable.assign( m_symbols.size() + 1, std::map< HyInt32, std::map< HyInt32, std::set< const HyGrammar* > > >() );
 
@@ -1885,6 +1898,8 @@ HyVoid HyGrammarParser::_ReadDataFile()
 			break;
 		}
 	}
+
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1919,7 +1934,6 @@ HySymbol* HyGrammarParser::_GetSymbol( const HyString& name )
 	return iter->second;
 }
 
-
 int HyGrammarParser::_GetStringCount(const char* const Str1, const char* const Str2)
 {
 	char		Buf[1024];
@@ -1936,4 +1950,37 @@ int HyGrammarParser::_GetStringCount(const char* const Str1, const char* const S
 	while((Str = strtok(NULL, " ")) != NULL);
 
 	return Count;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+/// @brief	calculate a hash code for input grammars
+/// 
+/// @return	hash code
+////////////////////////////////////////////////////////////////////////////////////////////////////
+HyUInt64 HyGrammarParser::_calc_input_grammar_hash() const
+{
+	HyString grammarString;
+	for ( const HyGrammar& grammar : m_inputGrammars )
+		grammarString += grammar.GetLeftSymbol().GetName() + "->" + grammar.GetRightString() + "\n";
+
+	HyUInt64    hashCode = 0;
+	std::size_t i        = 0; 
+	while ( i < grammarString.length() )
+	{
+		std::size_t remainingCount = std::min< std::size_t >( sizeof( hashCode ), grammarString.length() - i );
+
+		union
+		{
+			HyInt64 integerValue;
+			HyChar  charValues[ sizeof( HyInt64 ) ];
+		};
+
+		for ( HyInt32 j = 0; j < remainingCount; j++ )
+			charValues[ j ] = grammarString[ i + j ];
+
+		hashCode ^= integerValue;
+		i += remainingCount;
+	}
+
+	return hashCode;
 }

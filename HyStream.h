@@ -35,6 +35,7 @@ public:
 	virtual HyBool Serialize( HyUInt16& value )		{ return Serialize( &value, sizeof( value ) ); }
 	virtual HyBool Serialize( HyInt32& value )		{ return Serialize( &value, sizeof( value ) ); }
 	virtual HyBool Serialize( HyInt64& value )		{ return Serialize( &value, sizeof( value ) ); }
+	virtual HyBool Serialize( HyUInt64& value )		{ return Serialize( &value, sizeof( value ) ); }
 	virtual HyBool Serialize( HySingle& value )		{ return Serialize( &value, sizeof( value ) ); }
 	virtual HyBool Serialize( HyString& value ) = 0;
 

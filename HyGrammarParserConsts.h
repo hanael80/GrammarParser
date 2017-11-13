@@ -8,11 +8,3 @@
 
 
 #pragma once
-
-
-enum class InitFlag
-{
-	Nothing				= 0x00,
-	GenerateDataFile	= 0x01,
-	UseDataFile			= 0x02,
-};

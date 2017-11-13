@@ -75,7 +75,7 @@ public:
 
 protected:
 	/// 초기화한다.
-	HyVoid Init( HyUInt32 flag = (HyUInt32)( InitFlag::Nothing ) );
+	HyVoid Init();
 
 	/// 초기화할때를 처리한다.
 	virtual void OnInit() = 0;
@@ -129,10 +129,10 @@ private:
 		std::list<HyToken>::const_iterator itrTokenEnd,
 		const HySymbol* const pSymbol,
 		const HyToken& nextToken );
-	void _GenerateDataFile();
+	void _GenerateDataFile( HyUInt64 hashCode );
 
 	/// 데이터 파일을 읽는다.
-	HyVoid _ReadDataFile();
+	HyBool _ReadDataFile( HyUInt64 hashCode );
 
 	int	_GetStringCount(const char* const Str1, const char* const Str2);
 
@@ -141,6 +141,9 @@ private:
 
 	/// 심볼을 반환한다.
 	HySymbol* _GetSymbol( const HyString& name );
+
+	/// calculate a hash code for input grammars
+	HyUInt64 _calc_input_grammar_hash() const;
 };
 
 class CodeStackContent
@@ -169,7 +172,7 @@ public:
 	{
 		CodeStackContent Content;
 		Content.Type = Type;
-		Content.Value = (int*)Value;
+		Content.Value = (HyInt32*)(HyInt64)( Value );
 		push_back(Content);
 	}
 };

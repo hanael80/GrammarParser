@@ -46,6 +46,7 @@ public:
 	HyBool Write( HyUInt16 ushData)	{ return Write( (HyVoid*)( &ushData ), sizeof( ushData ) );	}
 	HyBool Write( HyInt32 iData)	{ return Write( (HyVoid*)( &iData ), sizeof( iData ) );		}
 	HyBool Write( HyUInt32 uiData)	{ return Write( (HyVoid*)( &uiData ), sizeof( uiData ) );	}
+	HyBool Write( HyUInt64 data)	{ return Write( (HyVoid*)( &data ), sizeof( data ) );       }
 
 	HyBool Write( const HyString& strData)
 	{
