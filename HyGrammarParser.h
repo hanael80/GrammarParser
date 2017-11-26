@@ -123,12 +123,15 @@ private:
 
 private:
 	void _ProcessDebugging(
-		int& iNextDebugLine,
-		const int iTotalLine,
-		std::list<HyToken>::const_iterator itrToken,
-		std::list<HyToken>::const_iterator itrTokenEnd,
-		const HySymbol* const pSymbol,
-		const HyToken& nextToken );
+		      int&                                 iNextDebugLine,
+		      int                                  iTotalLine,
+		      std::list< HyToken >::const_iterator itrToken,
+		      std::list< HyToken >::const_iterator itrTokenEnd,
+		const HySymbol*                            pSymbol,
+		const HyToken&                             nextToken,
+		const HyGrammar*&                          nextBreakGrammar,
+		      HyBool                               debugBreak );
+
 	void _GenerateDataFile( HyUInt64 hashCode );
 
 	/// 데이터 파일을 읽는다.

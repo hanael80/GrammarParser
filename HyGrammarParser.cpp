@@ -1366,8 +1366,10 @@ HyBool HyGrammarParser::_SyntaxAnalysis_LL( ParserData& parserData )
 
 	const HyUInt32 totalLine = parserData.m_tokens.rbegin()->m_line;
 
-	HyBool backTracking = false;
-	HyInt32 nextDebugLine;
+	      HyBool     backTracking     = false;
+	      HyInt32    nextDebugLine;
+	      HyBool     debugBreak       = false;
+	const HyGrammar* nextBreakGrammar = nullptr;
 
 	if ( m_debugging )
 		nextDebugLine = -1;
@@ -1383,7 +1385,7 @@ HyBool HyGrammarParser::_SyntaxAnalysis_LL( ParserData& parserData )
 
 		const HyToken& token = *stack.m_tokenIter;
 
-		std::list< HyToken >::const_iterator nextTokenIter = stack.m_tokenIter;
+		auto nextTokenIter = stack.m_tokenIter;
 		++nextTokenIter;
 		if ( nextTokenIter == parserData.m_tokens.end() )
 			--nextTokenIter;
@@ -1412,7 +1414,7 @@ HyBool HyGrammarParser::_SyntaxAnalysis_LL( ParserData& parserData )
 		const HySymbol* symbol = stack.m_symbols.back();
 		HY_ENSURE( symbol, return false );
 
-		_ProcessDebugging( nextDebugLine, totalLine, stack.m_tokenIter, parserData.m_tokens.end(), symbol, nextToken );
+		_ProcessDebugging( nextDebugLine, totalLine, stack.m_tokenIter, parserData.m_tokens.end(), symbol, nextToken, nextBreakGrammar, debugBreak );
 
 		if ( symbol->GetType() == HySymbol::typeTerminal )
 		{
@@ -1522,6 +1524,9 @@ HyBool HyGrammarParser::_SyntaxAnalysis_LL( ParserData& parserData )
 
 			stack.m_symbols.push_back( toSymbol );
 		}
+
+		if ( nextBreakGrammar == grammar )
+			debugBreak = true;
 	}
 
 	_Move( stack.m_derivationGrammars, parsedGrammars );
@@ -1682,12 +1687,14 @@ HyBool HyGrammarParser::_RestructureExecutiveActions(
 }
 
 void HyGrammarParser::_ProcessDebugging(
-	int& iNextDebugLine,
-	const int iTotalLine,
-	std::list<HyToken>::const_iterator itrToken,
-	std::list<HyToken>::const_iterator itrTokenEnd,
-	const HySymbol* const pSymbol,
-	const HyToken& nextToken)
+	      int&                                 iNextDebugLine,
+	      int                                  iTotalLine,
+	      std::list< HyToken >::const_iterator itrToken,
+	      std::list< HyToken >::const_iterator itrTokenEnd,
+	const HySymbol*                            pSymbol,
+	const HyToken&                             nextToken,
+	const HyGrammar*&                          nextBreakGrammar,
+	      HyBool                               debugBreak )
 {
 	const HyToken& token = *itrToken;
 
@@ -1695,43 +1702,62 @@ void HyGrammarParser::_ProcessDebugging(
 		printf("Symbol : %-30s, Token : %-20s, %-20s (%d)\n", pSymbol->GetName().c_str(), token.m_value.c_str(), nextToken.m_value.c_str(), token.m_line );
 // 	else
 // 		printf("\r%d/%d (%.2f%%)", token.m_iLine, iTotalLine, token.m_iLine * 100.0f / iTotalLine);
-	if(iNextDebugLine != -2 && (iNextDebugLine == -1 || iNextDebugLine <= token.m_line))
+	if ( !debugBreak && (iNextDebugLine == -2 || (iNextDebugLine != -1 && token.m_line < iNextDebugLine))) return;
+
+	if(iNextDebugLine > 0)
 	{
-		if(iNextDebugLine > 0)
+		iNextDebugLine = token.m_line;
+		printf("소스 --------------------------------------------------------------------------------------------------------------\n");
+		for ( auto itrCurToken = itrToken; itrCurToken != itrTokenEnd; ++itrCurToken )
 		{
-			iNextDebugLine = token.m_line;
-			printf("소스 --------------------------------------------------------------------------------------------------------------\n");
-			for(std::list<HyToken>::const_iterator itrCurToken = itrToken; itrCurToken != itrTokenEnd; ++itrCurToken)
-			{
-				const HyToken& token = *itrCurToken;
+			const HyToken& token = *itrCurToken;
 
-				if(iNextDebugLine < token.m_line)
-					break;
+			if ( iNextDebugLine < token.m_line )
+				break;
 
-				printf("%s ", token.m_value.c_str());
-			}
-			printf("\n");
-			printf("-------------------------------------------------------------------------------------------------------------------\n");
+			printf("%s ", token.m_value.c_str());
 		}
+		printf("\n");
+		printf("-------------------------------------------------------------------------------------------------------------------\n");
+	}
 
-		iNextDebugLine = -1;
+	iNextDebugLine = -1;
 
-		char szInput[64];
-		std::cin.getline(szInput, sizeof(szInput) - 1);
+	char szInput[ 512 ];
+	std::cin.getline(szInput, sizeof(szInput) - 1);
 
-		const char* const pszCommand = strtok(szInput, " ");
-		if(pszCommand != NULL)
+	const char* const pszCommand = strtok(szInput, " ");
+	if(pszCommand != NULL)
+	{
+		if ( !strcmp( pszCommand, "n" ) )
 		{
-			if(strcmp(pszCommand, "n") == 0)
+			const HyChar* pszLine = strtok( nullptr, " " );
+			if ( !pszLine )
+				iNextDebugLine = token.m_line + 1;
+			else
+				iNextDebugLine = atoi( pszLine );
+		}
+		else if ( !strcmp( pszCommand, "c" ) )
+		{
+			iNextDebugLine = -2;
+		}
+		else if ( !strcmp( pszCommand, "g" ) )
+		{
+			nextBreakGrammar = nullptr;
+
+			const HyChar* grammarString = strtok( nullptr, "" );
+			HY_ENSURE( grammarString, return );
+
+			for ( const HyGrammar& grammar : m_inputGrammars )
 			{
-				const char* const pszLine = strtok(NULL, " ");
-				if(pszLine == NULL)
-					iNextDebugLine = token.m_line + 1;
-				else
-					iNextDebugLine = atoi(pszLine);
+				HyString eachGrammarString = grammar.GetLeftSymbol().GetName() + " -> " + grammar.GetRightString();
+				if ( eachGrammarString == grammarString )
+				{
+					iNextDebugLine   = -2;
+					nextBreakGrammar = &grammar;
+					break;
+				}
 			}
-			else if(strcmp(pszCommand, "c") == 0)
-				iNextDebugLine = -2;
 		}
 	}
 }
